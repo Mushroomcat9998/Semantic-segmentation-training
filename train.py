@@ -1,14 +1,16 @@
-import datetime
+import re
 import os
+import glob
 import time
-
-import presets
-import torch
-import torch.utils.data
-import torchvision
 import utils
-from coco_utils import get_coco
+import torch
+import presets
+import datetime
+import torchvision
 from torch import nn
+import torch.utils.data
+from pathlib import Path
+from coco_utils import get_coco
 
 
 try:
@@ -97,9 +99,25 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
 
+def increment_path(path, exist_ok=False, sep='', mkdir=False):
+    # Increment file or directory path, i.e. runs/exp --> runs/exp{sep}2, runs/exp{sep}3, ... etc.
+    path = Path(path)  # os-agnostic
+    if path.exists() and not exist_ok:
+        path, suffix = (path.with_suffix(''), path.suffix) if path.is_file() else (path, '')
+        dirs = glob.glob(f"{path}{sep}*")  # similar paths
+        matches = [re.search(rf"%s{sep}(\d+)" % path.stem, d) for d in dirs]
+        i = [int(m.groups()[0]) for m in matches if m]  # indices
+        n = max(i) + 1 if i else 2  # increment number
+        path = Path(f"{path}{sep}{n}{suffix}")  # increment path
+    if mkdir:
+        path.mkdir(parents=True, exist_ok=True)  # make directory
+    return path
+
+
 def main(args):
     if args.weights and PM is None:
         raise ImportError("The prototype module couldn't be found. Please install the latest torchvision nightly.")
+    args.output_dir = os.path.join(args.output_dir, args.name)
     if args.output_dir:
         utils.mkdir(args.output_dir)
 
@@ -188,6 +206,7 @@ def main(args):
         lr_scheduler = main_lr_scheduler
     current_mean_iou = 0
     if args.resume:
+        args.output_dir = str(increment_path(Path(args.output_dir, exist_ok=True), mkdir=True))
         checkpoint = torch.load(args.resume, map_location="cpu")
         model_without_ddp.load_state_dict(checkpoint["model"], strict=not args.test_only)
         if not args.test_only:
@@ -267,6 +286,7 @@ def get_args_parser(add_help=True):
     parser.add_argument("--output-dir", default=".", type=str, help="path to save outputs")
     parser.add_argument("--resume", default="", type=str, help="path of checkpoint")
     parser.add_argument("--start-epoch", default=0, type=int, metavar="N", help="start epoch")
+    parser.add_argument('--name', default='exp', help='save to project/name')
     parser.add_argument(
         "--test-only",
         dest="test_only",
@@ -293,5 +313,5 @@ def get_args_parser(add_help=True):
 
 
 if __name__ == "__main__":
-    args = get_args_parser().parse_args()
-    main(args)
+    ARGS = get_args_parser().parse_args()
+    main(ARGS)
