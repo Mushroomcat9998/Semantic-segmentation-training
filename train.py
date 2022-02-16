@@ -36,9 +36,9 @@ def get_dataset(dir_path, name, image_set, transform):
 
 def get_transform(train, args):
     if train:
-        return presets.SegmentationPresetTrain(base_size=520, crop_size=480)
+        return presets.SegmentationPresetTrain(base_size=400, crop_size=350)
     elif not args.weights:
-        return presets.SegmentationPresetEval(base_size=520)
+        return presets.SegmentationPresetEval(base_size=400)
     else:
         fn = PM.segmentation.__dict__[args.model]
         weights = PM._api.get_weight(fn, args.weights)
